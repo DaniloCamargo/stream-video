@@ -1,9 +1,12 @@
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
+const cors = require('cors');
 
 const app = express();
-const port = 3000;
+const port = 3001;
+
+app.use(cors());
 
 // Configuração dos diretórios
 const videosDir = path.join(__dirname, 'videos');
