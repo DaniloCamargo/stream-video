@@ -87,7 +87,8 @@ app.post('/api/videos', (req, res) => {
 
     fs.writeFileSync(dataFilePath, JSON.stringify(videos, null, 2));
 
-    res.status(201).json(newVideo);
+    // res.status(201).json(newVideo);
+    res.status(201).redirect('/cadastro');
   });
 });
 
