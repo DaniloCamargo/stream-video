@@ -3,55 +3,97 @@ const path = require('path');
 const fs = require('fs');
 const cors = require('cors');
 const { spawn } = require('child_process');
+const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
 
 const app = express();
 const port = 3001;
 
 app.use(cors());
 
-// Configuração dos diretórios
 const videosDir = path.join(__dirname, 'videos');
 const thumbnailsDir = path.join(__dirname, 'thumbnails');
+const dataFilePath = path.join(__dirname, 'data', 'videos.json');
 
-// Verifica se a pasta "videos" existe, senão cria
 if (!fs.existsSync(videosDir)) {
   fs.mkdirSync(videosDir);
 }
 
-// Verifica se a pasta "thumbnails" existe, senão cria
 if (!fs.existsSync(thumbnailsDir)) {
   fs.mkdirSync(thumbnailsDir);
 }
 
-// Lista de vídeos disponíveis (adicione mais vídeos conforme necessário)
-const videos = [
-  {
-    id: 1,
-    title: 'Vídeo 5s',
-    filename: 'sample-5s.mp4',
-    thumb: 'sample-5s.png',
+if (!fs.existsSync(dataFilePath)) {
+  fs.writeFileSync(dataFilePath, '[]');
+}
+
+function readVideoData() {
+  const rawData = fs.readFileSync(dataFilePath);
+  const videoData = JSON.parse(rawData);
+  return videoData;
+}
+
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, videosDir);
   },
-  {
-    id: 2,
-    title: 'Vídeo 10s',
-    filename: 'sample-10s.mp4',
-    thumb: 'sample-10s.png',
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const filename = uuidv4() + ext;
+    cb(null, filename);
   },
-];
+});
+
+const upload = multer({ storage }).single('video');
+
+app.use(express.json());
 
 app.get('/', (req, res) => {
   res.send('Selecione um vídeo para assistir:');
 });
 
+app.post('/api/videos', (req, res) => {
+  upload(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      return res.status(500).json({ error: 'Erro no upload do vídeo' });
+    } else if (err) {
+      return res.status(500).json({ error: 'Erro interno no servidor' });
+    }
+
+    const videos = readVideoData();
+    const { title } = req.body;
+
+    if (!title || !req.file) {
+      return res.status(400).json({ error: 'Título, nome do arquivo e vídeo são obrigatórios' });
+    }
+
+    const newVideo = {
+      id: uuidv4(),
+      title,
+      filename: req.file.filename,
+    };
+
+    videos.push(newVideo);
+
+    fs.writeFileSync(dataFilePath, JSON.stringify(videos, null, 2));
+
+    res.status(201).json(newVideo);
+  });
+});
+
 app.get('/videos', (req, res) => {
+  const videos = readVideoData();
   res.json(videos);
 });
 
-// Adicione a rota para servir as imagens
+app.get('/cadastro', (req, res) => {
+  const filePath = path.join(__dirname, 'index.html');
+  res.sendFile(filePath);
+});
+
 const imagesDir = path.join(__dirname, 'images');
 app.use('/images', express.static(imagesDir));
 
-// Rota para obter a miniatura de um vídeo
 app.get('/api/thumbnails/:video_id', (req, res) => {
   const videoId = parseInt(req.params.video_id);
   const video = videos.find((v) => v.id === videoId);
@@ -64,14 +106,12 @@ app.get('/api/thumbnails/:video_id', (req, res) => {
   const thumbnailPath = path.join(thumbnailsDir, `${videoId}.jpg`);
 
   if (fs.existsSync(thumbnailPath)) {
-    // Se a miniatura já existe, envie-a como resposta
     return res.sendFile(thumbnailPath);
   }
 
-  // Se a miniatura não existe, crie-a usando a biblioteca 'fluent-ffmpeg'
   const ffmpegProcess = spawn('ffmpeg', [
     '-ss',
-    '00:00:01', // Captura a miniatura aos 1 segundo do vídeo
+    '00:00:01',
     '-i',
     videoPath,
     '-vf',
@@ -84,13 +124,13 @@ app.get('/api/thumbnails/:video_id', (req, res) => {
   ]);
 
   ffmpegProcess.on('close', () => {
-    // Após criar a miniatura, envie-a como resposta
     res.sendFile(thumbnailPath);
   });
 });
 
 app.get('/video/:video_id', (req, res) => {
-  const videoId = parseInt(req.params.video_id);
+  const videoId = req.params.video_id;
+  const videos = readVideoData();
   const video = videos.find((v) => v.id === videoId);
 
   if (!video) {
@@ -99,19 +139,15 @@ app.get('/video/:video_id', (req, res) => {
 
   const videoPath = path.join(videosDir, video.filename);
 
-  // Verifica se o arquivo de vídeo existe antes de prosseguir
   if (!fs.existsSync(videoPath)) {
     return res.status(404).send('Arquivo de vídeo não encontrado');
   }
 
-  // Define o tamanho do buffer de leitura (opcional)
   const chunkSize = 10 ** 6; // 1 MB
 
-  // Obtem as informações do arquivo de vídeo
   const videoStat = fs.statSync(videoPath);
   const fileSize = videoStat.size;
 
-  // Define os cabeçalhos para streaming
   const range = req.headers.range;
 
   if (range) {
