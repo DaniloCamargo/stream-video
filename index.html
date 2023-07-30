@@ -1,19 +1,26 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <title>Cadastro de Vídeo</title>
+  <title>Stream Vídeos</title>
 </head>
 <body>
-  <h1>Cadastro de Vídeo</h1>
-  <form action="/api/videos" method="post" enctype="multipart/form-data">
-
-    <label for="title">Título:</label>
-    <input type="text" id="title" name="title" required><br/><br/>
-
-    <label for="video">Vídeo:</label>
-    <input type="file" id="video" name="video" accept=".mp4" required><br/><br/>
-
-    <button type="submit">Cadastrar</button>
-  </form>
+    <style>
+        body {
+            padding-top: 10px;
+        }
+        .btn-outline-purple {
+            color: #8a2be2;
+            border: 1px #8a2be2 solid;
+            padding: 3px 5px;
+            border-radius: 8px;
+            text-decoration: none;
+        }
+            .btn-outline-purple:hover {
+                color: #ffffff;
+                border: 1px #8a2be2 solid;
+                background-color: #8a2be2;
+            }
+    </style>
+    <a class="btn-outline-purple" href="/cadastro">Cadastrar Vídeos</a>
 </body>
 </html>

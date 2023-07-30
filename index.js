@@ -35,21 +35,30 @@ function readVideoData() {
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, videosDir);
+    if (file.fieldname === 'video') {
+      cb(null, videosDir); // Define a pasta de destino para os vídeos
+    } else if (file.fieldname === 'thumb') {
+      cb(null, thumbnailsDir); // Define a pasta de destino para as thumbnails
+    }
   },
   filename: (req, file, cb) => {
     const ext = path.extname(file.originalname);
-    const filename = uuidv4() + ext;
+    const filename = uuidv4() + ext; // Gera um nome único para o arquivo
     cb(null, filename);
   },
 });
 
-const upload = multer({ storage }).single('video');
+// const upload = multer({ storage }).single('video');
+const upload = multer({ storage }).fields([
+  { name: 'video', maxCount: 1 }, // Especifica que o campo "video" pode ter no máximo 1 arquivo
+  { name: 'thumb', maxCount: 1 }, // Especifica que o campo "thumb" pode ter no máximo 1 arquivo
+]);
 
 app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.send('Selecione um vídeo para assistir:');
+  const filePath = path.join(__dirname, 'index.html');
+  res.sendFile(filePath);
 });
 
 app.post('/api/videos', (req, res) => {
@@ -63,14 +72,15 @@ app.post('/api/videos', (req, res) => {
     const videos = readVideoData();
     const { title } = req.body;
 
-    if (!title || !req.file) {
+    if (!title || !req.files || !req.files.thumb || !req.files.video) {
       return res.status(400).json({ error: 'Título, nome do arquivo e vídeo são obrigatórios' });
     }
 
     const newVideo = {
       id: uuidv4(),
       title,
-      filename: req.file.filename,
+      thumb: req.files.thumb[0].filename,
+      filename: req.files.video[0].filename,
     };
 
     videos.push(newVideo);
@@ -87,11 +97,11 @@ app.get('/videos', (req, res) => {
 });
 
 app.get('/cadastro', (req, res) => {
-  const filePath = path.join(__dirname, 'index.html');
+  const filePath = path.join(__dirname, 'cadastro.html');
   res.sendFile(filePath);
 });
 
-const imagesDir = path.join(__dirname, 'images');
+const imagesDir = path.join(__dirname, 'thumbnails');
 app.use('/images', express.static(imagesDir));
 
 app.get('/api/thumbnails/:video_id', (req, res) => {
@@ -129,7 +139,7 @@ app.get('/api/thumbnails/:video_id', (req, res) => {
 });
 
 app.get('/video/:video_id', (req, res) => {
-  const videoId = req.params.video_id;
+  const videoId = req.params.video_id.toString();
   const videos = readVideoData();
   const video = videos.find((v) => v.id === videoId);
 
